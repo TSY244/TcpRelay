@@ -4,6 +4,7 @@ import (
 	"TcpRelay/pkg/encryption"
 	"TcpRelay/pkg/socket"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -41,8 +42,10 @@ func Do(server *socket.Server, clientIp, clientPort string, encryptionMethod str
 	exitSignal := make(chan struct{}, 1)
 
 	flag := true
-
 	lock := sync.Mutex{}
+
+	srvKeyCopy := key
+	cliKeyCopy := key
 	go func() {
 		sc, err := server.Accept()
 		toCliSignal <- struct{}{}
@@ -54,6 +57,10 @@ func Do(server *socket.Server, clientIp, clientPort string, encryptionMethod str
 		buf := make([]byte, 1024)
 		for {
 			n, err := (*srvConn).Read(buf)
+			// EOF -> continue
+			if errors.Is(err, io.EOF) {
+				continue
+			}
 			if err != nil {
 				log.Println(" read error:", err)
 				exitSignal <- struct{}{}
@@ -66,7 +73,7 @@ func Do(server *socket.Server, clientIp, clientPort string, encryptionMethod str
 				flag = false
 			}
 			lock.Lock()
-			_, err = socket.Write(*cliConn, encryption.Encrypt(encryptionMethod, buf[:n], key))
+			_, err = socket.Write(*cliConn, encryption.Encrypt(encryptionMethod, buf[:n], srvKeyCopy))
 			lock.Unlock()
 			if err != nil {
 				log.Println("client write error:", err)
@@ -92,13 +99,17 @@ func Do(server *socket.Server, clientIp, clientPort string, encryptionMethod str
 		buf := make([]byte, 1024)
 		for {
 			n, err := (*cliConn).Read(buf)
+			if errors.Is(err, io.EOF) {
+				continue
+			}
 			if err != nil {
 				log.Println("client read error:", err)
-
+				exitSignal <- struct{}{}
+				break
 			}
 			log.Println("[192.168.79.1:10090] read from :", (*cliConn).RemoteAddr(), " size is ", n)
 			lock.Lock()
-			_, err = socket.Write(*srvConn, encryption.Decrypt(encryptionMethod, buf[:n], key))
+			_, err = socket.Write(*srvConn, encryption.Decrypt(encryptionMethod, buf[:n], cliKeyCopy))
 			lock.Unlock()
 			if err != nil {
 				log.Println("server write error:", err)
