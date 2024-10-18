@@ -1,7 +1,7 @@
 package main
 
 import (
-	"TcpRelay/config"
+	"TcpRelay/internal/config"
 	OneToOne "TcpRelay/internal/forwardingMethod"
 	"TcpRelay/internal/tpFlag"
 	"TcpRelay/pkg/socket"

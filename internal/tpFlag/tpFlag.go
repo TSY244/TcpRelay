@@ -1,7 +1,7 @@
 package tpFlag
 
 import (
-	"TcpRelay/config"
+	"TcpRelay/internal/config"
 	"flag"
 )
 
